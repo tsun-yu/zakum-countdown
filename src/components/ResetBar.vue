@@ -20,7 +20,7 @@ defineEmits(['reset'])
 
 .reset-btn {
   width: 100%;
-  padding: 14px;
+  padding: 18px;
   border-radius: $radius-md;
   background: $reset-btn;
   color: #fff;

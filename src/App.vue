@@ -1,11 +1,16 @@
 <template>
   <div class="app-wrapper">
     <div class="app-layout">
-      <ModeTabBar />
-      <MainTimer />
-      <CountdownBlock block-type="cube" />
-      <CountdownBlock block-type="water" />
-      <ResetBar @reset="showResetDialog = true" />
+      <div class="slot-tabs"><ModeTabBar /></div>
+      <div class="slot-main"><MainTimer /></div>
+      <div class="slot-cube"><CountdownBlock block-type="cube" /></div>
+      <div
+        class="slot-water"
+        :class="{ 'slot-water-hide': store.currentMode === 'body' }"
+      >
+        <CountdownBlock block-type="water" />
+      </div>
+      <div class="slot-reset"><ResetBar @reset="showResetDialog = true" /></div>
     </div>
 
     <ConfirmDialog
@@ -17,36 +22,38 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useTimerStore } from './stores/timer'
-import ModeTabBar from './components/ModeTabBar.vue'
-import MainTimer from './components/MainTimer.vue'
-import CountdownBlock from './components/CountdownBlock.vue'
-import ResetBar from './components/ResetBar.vue'
-import ConfirmDialog from './components/ConfirmDialog.vue'
+import { ref, onMounted, onUnmounted } from "vue";
+import { useTimerStore } from "./stores/timer";
+import ModeTabBar from "./components/ModeTabBar.vue";
+import MainTimer from "./components/MainTimer.vue";
+import CountdownBlock from "./components/CountdownBlock.vue";
+import ResetBar from "./components/ResetBar.vue";
+import ConfirmDialog from "./components/ConfirmDialog.vue";
 
-const store = useTimerStore()
-const showResetDialog = ref(false)
+const store = useTimerStore();
+const showResetDialog = ref(false);
 
 function handleReset() {
-  showResetDialog.value = false
-  store.resetAll()
+  showResetDialog.value = false;
+  store.resetAll();
 }
 
 function beforeUnloadHandler(e) {
   if (store.anyRunning) {
-    e.preventDefault()
-    e.returnValue = ''
+    e.preventDefault();
+    e.returnValue = "";
   }
 }
 
-onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler))
-onUnmounted(() => window.removeEventListener('beforeunload', beforeUnloadHandler))
+onMounted(() => window.addEventListener("beforeunload", beforeUnloadHandler));
+onUnmounted(() =>
+  window.removeEventListener("beforeunload", beforeUnloadHandler),
+);
 </script>
 
 <style lang="scss">
-@use './styles/global.scss';
-@use './styles/variables' as *;
+@use "./styles/global.scss";
+@use "./styles/variables" as *;
 
 .app-wrapper {
   width: 100%;
@@ -64,10 +71,16 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnloadHandler
   gap: 12px;
   flex: 1;
 
-  // Stretch cube/water blocks to fill available space
-  > :nth-child(3),
-  > :nth-child(4) {
+  .slot-cube,
+  .slot-water {
     flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    > * { flex: 1; min-height: 0; }
+  }
+  .slot-water-hide {
+    display: none;
   }
 }
 
@@ -90,11 +103,29 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnloadHandler
     gap: 8px;
     flex: 1;
 
-    > :nth-child(1) { grid-area: tabs; }
-    > :nth-child(2) { grid-area: main; }
-    > :nth-child(3) { grid-area: cube; flex: unset; }
-    > :nth-child(4) { grid-area: water; flex: unset; }
-    > :nth-child(5) { grid-area: reset; }
+    .slot-tabs {
+      grid-area: tabs;
+    }
+    .slot-main {
+      grid-area: main;
+    }
+    .slot-cube {
+      grid-area: cube;
+    }
+    .slot-water {
+      grid-area: water;
+    }
+    .slot-reset {
+      grid-area: reset;
+    }
+
+    // body mode: cube takes full middle row
+    &:not(:has(.slot-water)) {
+      grid-template-areas:
+        "tabs  tabs  tabs"
+        "main  cube  cube"
+        "reset reset reset";
+    }
   }
 }
 </style>

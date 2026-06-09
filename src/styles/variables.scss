@@ -13,11 +13,25 @@ $border-color: #2a2a4a;
 $tab-active-bg: #e94560;
 $tab-inactive-bg: #0f3460;
 $progress-bg: #2a2a4a;
-$progress-fill: #e94560;
-$progress-warn: #ff6b35;
 $overlay-bg: rgba(14, 14, 30, 0.88);
 $reset-btn: #c0392b;
 $reset-btn-hover: #e74c3c;
+
+// Cube (魔方) — green
+$cube-border: #27ae60;
+$cube-border-warn: #f39c12;
+$cube-progress: #2ecc71;
+$cube-progress-warn: #f39c12;
+$cube-warn-text: #f39c12;
+$cube-overlay-text: #2ecc71;
+
+// Water (黑水) — purple
+$water-border: #8e44ad;
+$water-border-warn: #e74c3c;
+$water-progress: #9b59b6;
+$water-progress-warn: #e74c3c;
+$water-warn-text: #e74c3c;
+$water-overlay-text: #9b59b6;
 
 // Spacing
 $radius-sm: 6px;
