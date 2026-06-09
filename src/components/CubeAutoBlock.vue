@@ -47,10 +47,16 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useTimerStore } from '../stores/timer'
+import { useSpeech } from '../composables/useSpeech'
 
 const store = useTimerStore()
+const { speak } = useSpeech()
+
+watch(() => store.cubeAutoTimer.isWarning, (val) => {
+  if (val) speak('注意場地魔方')
+})
 
 const progressPct = computed(() => {
   const d = store.CUBE_AUTO_DURATION

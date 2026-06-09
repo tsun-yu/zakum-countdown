@@ -69,8 +69,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useTimerStore } from "../stores/timer";
+import { useSpeech } from "../composables/useSpeech";
 
 const props = defineProps({
   blockType: {
@@ -80,6 +81,7 @@ const props = defineProps({
 });
 
 const store = useTimerStore();
+const { speak } = useSpeech();
 const timer = computed(() =>
   props.blockType === "cube" ? store.cubeTimer : store.waterTimer,
 );
@@ -125,6 +127,11 @@ const isWarning = computed(
 const warnText = computed(() =>
   props.blockType === "cube" ? "注意魔方" : "注意黑水",
 );
+
+watch(isWarning, (val) => {
+  if (!val) return
+  speak(props.blockType === 'cube' ? '注意機制魔方' : '小心黑水')
+})
 
 // ── Click handler ─────────────────────────────────────────
 function handleClick() {
