@@ -3,13 +3,22 @@
     <div class="app-layout">
       <div class="slot-tabs"><ModeTabBar /></div>
       <div class="slot-main"><MainTimer /></div>
-      <div class="slot-cube"><CountdownBlock block-type="cube" /></div>
-      <div
-        class="slot-water"
-        :class="{ 'slot-water-hide': store.currentMode === 'body' }"
-      >
+
+      <!-- cube-auto: body + hand1（隱藏時仍保留 DOM，計時不中斷） -->
+      <div v-show="showCubeAuto" class="slot-cube-auto">
+        <CubeAutoBlock />
+      </div>
+
+      <!-- cube (40s click): hand1/2/3 -->
+      <div v-if="showCube" class="slot-cube">
+        <CountdownBlock block-type="cube" />
+      </div>
+
+      <!-- water (40s click): hand1/2/3 -->
+      <div v-if="showWater" class="slot-water">
         <CountdownBlock block-type="water" />
       </div>
+
       <div class="slot-reset"><ResetBar @reset="showResetDialog = true" /></div>
     </div>
 
@@ -22,16 +31,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useTimerStore } from "./stores/timer";
 import ModeTabBar from "./components/ModeTabBar.vue";
 import MainTimer from "./components/MainTimer.vue";
+import CubeAutoBlock from "./components/CubeAutoBlock.vue";
 import CountdownBlock from "./components/CountdownBlock.vue";
 import ResetBar from "./components/ResetBar.vue";
 import ConfirmDialog from "./components/ConfirmDialog.vue";
 
 const store = useTimerStore();
 const showResetDialog = ref(false);
+
+const showCubeAuto = computed(() =>
+  store.currentMode === "body" || store.currentMode === "hand1"
+);
+const showCube = computed(() => store.currentMode !== "body");
+const showWater = computed(() => store.currentMode !== "body");
 
 function handleReset() {
   showResetDialog.value = false;
@@ -71,6 +87,7 @@ onUnmounted(() =>
   gap: 12px;
   flex: 1;
 
+  .slot-cube-auto,
   .slot-cube,
   .slot-water {
     flex: 1;
@@ -78,9 +95,13 @@ onUnmounted(() =>
     display: flex;
     flex-direction: column;
     > * { flex: 1; min-height: 0; }
-  }
-  .slot-water-hide {
-    display: none;
+
+    &[style*="display: none"] {
+      flex: 0;
+      min-height: 0;
+      padding: 0;
+      margin: 0;
+    }
   }
 }
 
@@ -94,38 +115,45 @@ onUnmounted(() =>
 
   .app-layout {
     display: grid;
-    grid-template-areas:
-      "tabs  tabs  tabs"
-      "main  cube  water"
-      "reset reset reset";
-    grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: auto 1fr auto;
     gap: 8px;
     flex: 1;
 
-    .slot-tabs {
-      grid-area: tabs;
-    }
-    .slot-main {
-      grid-area: main;
-    }
-    .slot-cube {
-      grid-area: cube;
-    }
-    .slot-water {
-      grid-area: water;
-    }
-    .slot-reset {
-      grid-area: reset;
+    // body: cube-auto fills middle
+    &:has(.slot-cube-auto):not(:has(.slot-cube)) {
+      grid-template-areas:
+        "tabs      tabs      tabs"
+        "main      cube-auto cube-auto"
+        "reset     reset     reset";
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto 1fr auto;
     }
 
-    // body mode: cube takes full middle row
-    &:not(:has(.slot-water)) {
+    // hand1: cube-auto + cube + water
+    &:has(.slot-cube-auto):has(.slot-cube) {
+      grid-template-areas:
+        "tabs      tabs tabs  tabs"
+        "main      cauto cube water"
+        "reset     reset reset reset";
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    // hand2/3: cube + water
+    &:not(:has(.slot-cube-auto)):has(.slot-cube) {
       grid-template-areas:
         "tabs  tabs  tabs"
-        "main  cube  cube"
+        "main  cube  water"
         "reset reset reset";
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto 1fr auto;
     }
+
+    .slot-tabs      { grid-area: tabs; }
+    .slot-main      { grid-area: main; }
+    .slot-cube-auto { grid-area: cauto; }
+    .slot-cube      { grid-area: cube; }
+    .slot-water     { grid-area: water; }
+    .slot-reset     { grid-area: reset; }
   }
 }
 </style>

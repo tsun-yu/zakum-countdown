@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, reactive, computed } from 'vue'
 
 const MAIN_INITIAL = 30 * 60 + 30 // 1830s
-const CUBE_BODY_DURATION = 150     // 2m30s
+const CUBE_AUTO_DURATION = 150     // 2m30s
 const CUBE_HAND_DURATION = 40
 const WATER_DURATION = 40
 
@@ -26,10 +26,19 @@ export const useTimerStore = defineStore('timer', () => {
   let mainIntervalId = null
 
   // Sub timers
+  const cubeAutoTimer = reactive({
+    current: 0,
+    isRunning: false,
+    hasStarted: false,
+    isWarning: false,
+    estimatedTime: null,
+  })
   const cubeTimer = makeSubTimer()
   const waterTimer = makeSubTimer()
 
   // Interval/timeout IDs (not reactive — never displayed)
+  let cubeAutoIntervalId = null
+  let cubeAutoWarnTimeoutId = null
   let cubeIntervalId = null
   let cubeResetTimeoutId = null
   let waterIntervalId = null
@@ -37,12 +46,10 @@ export const useTimerStore = defineStore('timer', () => {
 
   // ─── Computed ────────────────────────────────────────────
   const anyRunning = computed(
-    () => mainIsRunning.value || cubeTimer.isRunning || waterTimer.isRunning
+    () => mainIsRunning.value || cubeAutoTimer.isRunning || cubeTimer.isRunning || waterTimer.isRunning
   )
 
-  const cubeDuration = computed(() =>
-    currentMode.value === 'body' ? CUBE_BODY_DURATION : CUBE_HAND_DURATION
-  )
+  const cubeDuration = computed(() => CUBE_HAND_DURATION)
 
   // ─── Helpers ─────────────────────────────────────────────
   function formatTime(seconds) {
@@ -50,6 +57,20 @@ export const useTimerStore = defineStore('timer', () => {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  }
+
+  function clearCubeAuto() {
+    if (cubeAutoIntervalId) { clearInterval(cubeAutoIntervalId); cubeAutoIntervalId = null }
+    if (cubeAutoWarnTimeoutId) { clearTimeout(cubeAutoWarnTimeoutId); cubeAutoWarnTimeoutId = null }
+  }
+
+  function resetCubeAutoState() {
+    clearCubeAuto()
+    cubeAutoTimer.current = 0
+    cubeAutoTimer.isRunning = false
+    cubeAutoTimer.hasStarted = false
+    cubeAutoTimer.isWarning = false
+    cubeAutoTimer.estimatedTime = null
   }
 
   function clearCube() {
@@ -98,8 +119,35 @@ export const useTimerStore = defineStore('timer', () => {
 
   function adjustMain(delta) {
     mainCurrent.value = Math.max(0, mainCurrent.value + delta)
+    if (cubeAutoTimer.estimatedTime !== null) cubeAutoTimer.estimatedTime += delta
     if (cubeTimer.estimatedTime !== null) cubeTimer.estimatedTime += delta
     if (waterTimer.estimatedTime !== null) waterTimer.estimatedTime += delta
+  }
+
+  // ─── CubeAuto timer (2m30s loop) ─────────────────────────
+  function _runCubeAutoInterval() {
+    cubeAutoIntervalId = setInterval(() => {
+      if (cubeAutoTimer.current > 0) {
+        cubeAutoTimer.current--
+        if (cubeAutoTimer.current <= 5) cubeAutoTimer.isWarning = true
+      } else {
+        // Restart immediately, reset warning
+        cubeAutoTimer.estimatedTime = mainCurrent.value - CUBE_AUTO_DURATION
+        cubeAutoTimer.current = CUBE_AUTO_DURATION
+        cubeAutoTimer.isWarning = false
+      }
+    }, 1000)
+  }
+
+  function startCubeAuto() {
+    if (!mainHasStarted.value) return
+    clearCubeAuto()
+    cubeAutoTimer.estimatedTime = mainCurrent.value - CUBE_AUTO_DURATION
+    cubeAutoTimer.current = CUBE_AUTO_DURATION
+    cubeAutoTimer.isRunning = true
+    cubeAutoTimer.hasStarted = true
+    cubeAutoTimer.isWarning = false
+    _runCubeAutoInterval()
   }
 
   // ─── Cube timer ───────────────────────────────────────────
@@ -170,6 +218,7 @@ export const useTimerStore = defineStore('timer', () => {
     mainCurrent.value = MAIN_INITIAL
     mainIsRunning.value = false
     mainHasStarted.value = false
+    resetCubeAutoState()
     resetCubeState()
     resetWaterState()
     currentMode.value = 'body'
@@ -180,6 +229,7 @@ export const useTimerStore = defineStore('timer', () => {
     mainCurrent,
     mainIsRunning,
     mainHasStarted,
+    cubeAutoTimer,
     cubeTimer,
     waterTimer,
     anyRunning,
@@ -187,13 +237,15 @@ export const useTimerStore = defineStore('timer', () => {
     formatTime,
     startMain,
     adjustMain,
+    startCubeAuto,
+    resetCubeAutoState,
     startCube,
     earlyResetCube,
     startWater,
     earlyResetWater,
     setMode,
     resetAll,
-    CUBE_BODY_DURATION,
+    CUBE_AUTO_DURATION,
     CUBE_HAND_DURATION,
     WATER_DURATION,
   }

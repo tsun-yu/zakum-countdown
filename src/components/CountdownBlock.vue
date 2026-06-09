@@ -84,16 +84,14 @@ const timer = computed(() =>
   props.blockType === "cube" ? store.cubeTimer : store.waterTimer,
 );
 
-const duration = computed(() =>
-  props.blockType === "cube" ? store.cubeDuration : store.WATER_DURATION,
-);
+const duration = computed(() => store.WATER_DURATION);
 
 // ── Overlay ──────────────────────────────────────────────
 const overlayText = computed(() => {
-  if (props.blockType === "cube") {
-    return store.currentMode === "body" ? "召喚炎魔" : "出現黑水";
+  if (props.blockType === "water") {
+    return store.currentMode === "hand3" ? "出現魔方" : "出現雙魔方";
   }
-  return "出現雙魔方";
+  return "出現黑水";
 });
 
 // Overlay only shows before start; done state shows warning content instead
@@ -101,11 +99,7 @@ const showOverlay = computed(() => !timer.value.hasStarted);
 
 // ── Time display ─────────────────────────────────────────
 const displayTime = computed(() => {
-  const s = timer.value.current;
-  if (props.blockType === "cube" && store.currentMode === "body") {
-    return store.formatTime(s);
-  }
-  return String(s).padStart(2, "0");
+  return String(timer.value.current).padStart(2, "0");
 });
 
 // ── Estimated time ────────────────────────────────────────
@@ -429,8 +423,12 @@ function handleSwipeReset() {
   pointer-events: auto;
   transition: transform 0.15s ease;
 
-  &.cube  { background: rgba(39, 174, 96, 0.18); }
-  &.water { background: rgba(142, 68, 173, 0.18); }
+  &.cube {
+    background: rgba(39, 174, 96, 0.18);
+  }
+  &.water {
+    background: rgba(142, 68, 173, 0.18);
+  }
 }
 
 .warn-text {
@@ -439,12 +437,21 @@ function handleSwipeReset() {
   letter-spacing: 4px;
   animation: flash 0.6s ease-in-out infinite;
 
-  &.cube  { color: $cube-warn-text; }
-  &.water { color: $water-warn-text; }
+  &.cube {
+    color: $cube-warn-text;
+  }
+  &.water {
+    color: $water-warn-text;
+  }
 }
 
 @keyframes flash {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.2; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
 }
 </style>
