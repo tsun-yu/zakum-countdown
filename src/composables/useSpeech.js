@@ -1,25 +1,42 @@
-let audioUnlocked = false
+const clips = {
+  '注意場地魔方': '/sounds/cube_auto_warn.mp3',
+  '注意機制魔方': '/sounds/cube_warn.mp3',
+  '小心黑水':     '/sounds/water_warn.mp3',
+}
+
+// Pre-create Audio elements so they're ready to play instantly
+const audioPool = Object.fromEntries(
+  Object.entries(clips).map(([key, src]) => {
+    const a = new Audio(src)
+    a.preload = 'auto'
+    return [key, a]
+  })
+)
+
+let unlocked = false
 
 export function useSpeech() {
-  // iOS requires speechSynthesis to be triggered once from a user gesture.
-  // Call unlock() on the first touch/click to satisfy this requirement.
+  // iOS requires a user gesture before any Audio can play.
+  // Call this once on the first touchstart / pointerdown.
   function unlock() {
-    if (audioUnlocked || !window.speechSynthesis) return
-    audioUnlocked = true
-    const silent = new SpeechSynthesisUtterance('')
-    silent.volume = 0
-    window.speechSynthesis.speak(silent)
+    if (unlocked) return
+    unlocked = true
+    // Play every clip at volume 0 to satisfy iOS autoplay policy
+    Object.values(audioPool).forEach(a => {
+      a.volume = 0
+      a.play().then(() => {
+        a.pause()
+        a.currentTime = 0
+        a.volume = 1
+      }).catch(() => {})
+    })
   }
 
-  function speak(text) {
-    if (!window.speechSynthesis) return
-    // Cancel any stuck utterance, then force-resume (iOS can silently pause synthesis)
-    window.speechSynthesis.cancel()
-    window.speechSynthesis.resume()
-    const utt = new SpeechSynthesisUtterance(text)
-    utt.lang = 'zh-TW'
-    utt.rate = 1.05
-    window.speechSynthesis.speak(utt)
+  function speak(key) {
+    const a = audioPool[key]
+    if (!a) return
+    a.currentTime = 0
+    a.play().catch(() => {})
   }
 
   return { speak, unlock }
