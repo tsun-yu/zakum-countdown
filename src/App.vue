@@ -33,6 +33,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useTimerStore } from "./stores/timer";
+import { useSpeech } from "./composables/useSpeech";
 import ModeTabBar from "./components/ModeTabBar.vue";
 import MainTimer from "./components/MainTimer.vue";
 import CubeAutoBlock from "./components/CubeAutoBlock.vue";
@@ -41,6 +42,7 @@ import ResetBar from "./components/ResetBar.vue";
 import ConfirmDialog from "./components/ConfirmDialog.vue";
 
 const store = useTimerStore();
+const { unlock } = useSpeech();
 const showResetDialog = ref(false);
 
 const showCubeAuto = computed(() =>
@@ -61,7 +63,11 @@ function beforeUnloadHandler(e) {
   }
 }
 
-onMounted(() => window.addEventListener("beforeunload", beforeUnloadHandler));
+onMounted(() => {
+  window.addEventListener("beforeunload", beforeUnloadHandler);
+  window.addEventListener("touchstart", unlock, { once: true, passive: true });
+  window.addEventListener("pointerdown", unlock, { once: true });
+});
 onUnmounted(() =>
   window.removeEventListener("beforeunload", beforeUnloadHandler),
 );

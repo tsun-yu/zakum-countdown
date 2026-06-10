@@ -55,7 +55,9 @@ const store = useTimerStore()
 const { speak } = useSpeech()
 
 watch(() => store.cubeAutoTimer.isWarning, (val) => {
-  if (val) speak('注意場地魔方')
+  if (val && (store.currentMode === 'body' || store.currentMode === 'hand1')) {
+    speak('注意場地魔方')
+  }
 })
 
 const progressPct = computed(() => {
