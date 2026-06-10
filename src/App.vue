@@ -4,17 +4,17 @@
       <div class="slot-tabs"><ModeTabBar /></div>
       <div class="slot-main"><MainTimer /></div>
 
-      <!-- cube-auto: body + hand1（隱藏時仍保留 DOM，計時不中斷） -->
+      <!-- cube-auto: hand + body1（隱藏時仍保留 DOM，計時不中斷） -->
       <div v-show="showCubeAuto" class="slot-cube-auto">
         <CubeAutoBlock />
       </div>
 
-      <!-- cube (40s click): hand1/2/3 -->
+      <!-- cube (40s click): body1/2/3 -->
       <div v-if="showCube" class="slot-cube">
         <CountdownBlock block-type="cube" />
       </div>
 
-      <!-- water (40s click): hand1/2/3 -->
+      <!-- water (40s click): body1/2/3 -->
       <div v-if="showWater" class="slot-water">
         <CountdownBlock block-type="water" />
       </div>
@@ -45,11 +45,11 @@ const store = useTimerStore();
 const { unlock } = useSpeech();
 const showResetDialog = ref(false);
 
-const showCubeAuto = computed(() =>
-  store.currentMode === "body" || store.currentMode === "hand1"
+const showCubeAuto = computed(
+  () => store.currentMode === "hand" || store.currentMode === "body1",
 );
-const showCube = computed(() => store.currentMode !== "body");
-const showWater = computed(() => store.currentMode !== "body");
+const showCube = computed(() => store.currentMode !== "hand");
+const showWater = computed(() => store.currentMode !== "hand");
 
 function handleReset() {
   showResetDialog.value = false;
@@ -100,7 +100,10 @@ onUnmounted(() =>
     min-height: 0;
     display: flex;
     flex-direction: column;
-    > * { flex: 1; min-height: 0; }
+    > * {
+      flex: 1;
+      min-height: 0;
+    }
 
     &[style*="display: none"] {
       flex: 0;
@@ -124,7 +127,7 @@ onUnmounted(() =>
     gap: 8px;
     flex: 1;
 
-    // body: cube-auto fills middle
+    // hand: cube-auto fills middle
     &:has(.slot-cube-auto):not(:has(.slot-cube)) {
       grid-template-areas:
         "tabs      tabs      tabs"
@@ -134,7 +137,7 @@ onUnmounted(() =>
       grid-template-rows: auto 1fr auto;
     }
 
-    // hand1: cube-auto + cube + water
+    // body1: cube-auto + cube + water
     &:has(.slot-cube-auto):has(.slot-cube) {
       grid-template-areas:
         "tabs      tabs tabs  tabs"
@@ -144,7 +147,7 @@ onUnmounted(() =>
       grid-template-rows: auto 1fr auto;
     }
 
-    // hand2/3: cube + water
+    // body2/3: cube + water
     &:not(:has(.slot-cube-auto)):has(.slot-cube) {
       grid-template-areas:
         "tabs  tabs  tabs"
@@ -154,12 +157,24 @@ onUnmounted(() =>
       grid-template-rows: auto 1fr auto;
     }
 
-    .slot-tabs      { grid-area: tabs; }
-    .slot-main      { grid-area: main; }
-    .slot-cube-auto { grid-area: cauto; }
-    .slot-cube      { grid-area: cube; }
-    .slot-water     { grid-area: water; }
-    .slot-reset     { grid-area: reset; }
+    .slot-tabs {
+      grid-area: tabs;
+    }
+    .slot-main {
+      grid-area: main;
+    }
+    .slot-cube-auto {
+      grid-area: cauto;
+    }
+    .slot-cube {
+      grid-area: cube;
+    }
+    .slot-water {
+      grid-area: water;
+    }
+    .slot-reset {
+      grid-area: reset;
+    }
   }
 }
 </style>

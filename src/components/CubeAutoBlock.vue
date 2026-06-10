@@ -5,7 +5,8 @@
       class="countdown-block cube"
       :class="{
         disabled: !store.mainHasStarted,
-        running: store.cubeAutoTimer.isRunning && !store.cubeAutoTimer.isWarning,
+        running:
+          store.cubeAutoTimer.isRunning && !store.cubeAutoTimer.isWarning,
         warning: store.cubeAutoTimer.isWarning,
       }"
       @click="handleClick"
@@ -18,7 +19,9 @@
       <!-- Active content -->
       <template v-else>
         <div class="top-row">
-          <span class="countdown-time">{{ store.formatTime(store.cubeAutoTimer.current) }}</span>
+          <span class="countdown-time">{{
+            store.formatTime(store.cubeAutoTimer.current)
+          }}</span>
         </div>
 
         <div class="estimated-row" v-if="estimatedLabel">
@@ -47,41 +50,47 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
-import { useTimerStore } from '../stores/timer'
-import { useSpeech } from '../composables/useSpeech'
+import { computed, watch } from "vue";
+import { useTimerStore } from "../stores/timer";
+import { useSpeech } from "../composables/useSpeech";
 
-const store = useTimerStore()
-const { speak } = useSpeech()
+const store = useTimerStore();
+const { speak } = useSpeech();
 
-watch(() => store.cubeAutoTimer.isWarning, (val) => {
-  if (val && (store.currentMode === 'body' || store.currentMode === 'hand1')) {
-    speak('注意場地魔方')
-  }
-})
+watch(
+  () => store.cubeAutoTimer.isWarning,
+  (val) => {
+    if (
+      val &&
+      (store.currentMode === "hand" || store.currentMode === "body1")
+    ) {
+      speak("注意場地魔方");
+    }
+  },
+);
 
 const progressPct = computed(() => {
-  const d = store.CUBE_AUTO_DURATION
-  return (store.cubeAutoTimer.current / d) * 100
-})
+  const d = store.CUBE_AUTO_DURATION;
+  return (store.cubeAutoTimer.current / d) * 100;
+});
 
 const estimatedLabel = computed(() => {
-  const est = store.cubeAutoTimer.estimatedTime
-  if (est === null) return null
-  return store.formatTime(est)
-})
+  const est = store.cubeAutoTimer.estimatedTime;
+  if (est === null) return null;
+  return store.formatTime(est);
+});
 
 function handleClick() {
-  if (!store.mainHasStarted) return
+  if (!store.mainHasStarted) return;
   if (!store.cubeAutoTimer.hasStarted) {
-    store.startCubeAuto()
+    store.startCubeAuto();
   }
 }
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
-@use '../styles/variables' as *;
+@use "sass:color";
+@use "../styles/variables" as *;
 
 .block-wrapper {
   position: relative;
@@ -181,7 +190,9 @@ function handleClick() {
 .progress-fill {
   height: 100%;
   border-radius: 4px;
-  transition: width 0.9s linear, background 0.3s;
+  transition:
+    width 0.9s linear,
+    background 0.3s;
 
   &.cube {
     background: $cube-progress;
@@ -200,7 +211,9 @@ function handleClick() {
   border-radius: $radius-lg;
   pointer-events: auto;
 
-  &.cube { background: rgba(39, 174, 96, 0.18); }
+  &.cube {
+    background: rgba(39, 174, 96, 0.18);
+  }
 }
 
 .warn-text {
@@ -209,11 +222,18 @@ function handleClick() {
   letter-spacing: 4px;
   animation: flash 0.6s ease-in-out infinite;
 
-  &.cube { color: $cube-warn-text; }
+  &.cube {
+    color: $cube-warn-text;
+  }
 }
 
 @keyframes flash {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.2; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
 }
 </style>

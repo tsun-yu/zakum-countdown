@@ -13,20 +13,20 @@
 </template>
 
 <script setup>
-import { useTimerStore } from '../stores/timer'
+import { useTimerStore } from "../stores/timer";
 
-const store = useTimerStore()
+const store = useTimerStore();
 
 const tabs = [
-  { label: '本體', value: 'body' },
-  { label: '手階段一', value: 'hand1' },
-  { label: '手階段二', value: 'hand2' },
-  { label: '手階段三', value: 'hand3' },
-]
+  { label: "手階段", value: "hand" },
+  { label: "本體一", value: "body1" },
+  { label: "本體二", value: "body2" },
+  { label: "本體三", value: "body3" },
+];
 </script>
 
 <style lang="scss" scoped>
-@use '../styles/variables' as *;
+@use "../styles/variables" as *;
 
 .mode-tab-bar {
   display: flex;
@@ -42,7 +42,9 @@ const tabs = [
   font-weight: 600;
   background: $tab-inactive-bg;
   color: $text-secondary;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
   white-space: nowrap;
 
   &.active {

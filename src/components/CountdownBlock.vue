@@ -91,7 +91,7 @@ const duration = computed(() => store.WATER_DURATION);
 // ── Overlay ──────────────────────────────────────────────
 const overlayText = computed(() => {
   if (props.blockType === "water") {
-    return store.currentMode === "hand3" ? "出現魔方" : "出現雙魔方";
+    return store.currentMode === "body3" ? "出現魔方" : "出現雙魔方";
   }
   return "出現黑水";
 });
@@ -129,9 +129,9 @@ const warnText = computed(() =>
 );
 
 watch(isWarning, (val) => {
-  if (!val) return
-  speak(props.blockType === 'cube' ? '注意機制魔方' : '小心黑水')
-})
+  if (!val) return;
+  speak(props.blockType === "cube" ? "注意機制魔方" : "小心黑水");
+});
 
 // ── Click handler ─────────────────────────────────────────
 function handleClick() {
