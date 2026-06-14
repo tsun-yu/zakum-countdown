@@ -2,7 +2,7 @@ const clips = {
   注意場地魔方: "/sounds/cube_auto_warn.mp3",
   注意機制魔方: "/sounds/cube_warn.mp3",
   小心黑水: "/sounds/water_warn.mp3",
-  給我狀態: "/sounds/buff_warn.mp3",
+  給我狀態: "/sounds/buff_warn_wayne.m4a",
 };
 
 // ── Platform detection ─────────────────────────────────────
@@ -21,6 +21,7 @@ const isSafari =
   /^((?!chrome|crios|fxios|edg|android).)*safari/i.test(ua);
 
 const useAudioFiles = isIOS || isSafari;
+const forceAudioKeys = new Set(["給我狀態"]);
 const hasSpeechSynthesis =
   typeof window !== "undefined" && "speechSynthesis" in window;
 
@@ -29,16 +30,13 @@ const voiceState = {
   initialized: false,
 };
 
-// Pre-create Audio elements only when we actually need them
-const audioPool = useAudioFiles
-  ? Object.fromEntries(
-      Object.entries(clips).map(([key, src]) => {
-        const a = new Audio(src);
-        a.preload = "auto";
-        return [key, a];
-      }),
-    )
-  : {};
+const audioPool = Object.fromEntries(
+  Object.entries(clips).map(([key, src]) => {
+    const a = new Audio(src);
+    a.preload = "auto";
+    return [key, a];
+  }),
+);
 
 let unlocked = false;
 
@@ -86,6 +84,17 @@ function ensureVoiceInitialized() {
 export function useSpeech() {
   ensureVoiceInitialized();
 
+  function warmAudio(a) {
+    a.volume = 0;
+    a.play()
+      .then(() => {
+        a.pause();
+        a.currentTime = 0;
+        a.volume = 1;
+      })
+      .catch(() => {});
+  }
+
   // iOS / Safari require a user gesture before any Audio can play.
   // Some Android browsers also need a gesture before SpeechSynthesis works
   // reliably. Call this once on the first touchstart / pointerdown.
@@ -96,16 +105,15 @@ export function useSpeech() {
     if (useAudioFiles) {
       // Play every clip at volume 0 to satisfy iOS autoplay policy
       Object.values(audioPool).forEach((a) => {
-        a.volume = 0;
-        a.play()
-          .then(() => {
-            a.pause();
-            a.currentTime = 0;
-            a.volume = 1;
-          })
-          .catch(() => {});
+        warmAudio(a);
       });
     } else if (hasSpeechSynthesis) {
+      // Also warm up forced-audio clip on non-iOS/Safari.
+      forceAudioKeys.forEach((key) => {
+        const a = audioPool[key];
+        if (a) warmAudio(a);
+      });
+
       // Warm up the speech engine with a silent utterance so the first
       // real call doesn't get swallowed on some Android Chrome builds.
       try {
@@ -119,7 +127,7 @@ export function useSpeech() {
   }
 
   function speak(key) {
-    if (useAudioFiles) {
+    if (useAudioFiles || forceAudioKeys.has(key)) {
       const a = audioPool[key];
       if (!a) return;
       a.currentTime = 0;
