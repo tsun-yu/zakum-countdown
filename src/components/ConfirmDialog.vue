@@ -2,7 +2,7 @@
   <Teleport to="body">
     <div v-if="visible" class="dialog-backdrop" @click.self="$emit('cancel')">
       <div class="dialog">
-        <p class="dialog-msg">確定要重置所有計時器嗎？</p>
+        <p class="dialog-msg">{{ message }}</p>
         <div class="dialog-actions">
           <button class="btn-cancel" @click="$emit('cancel')">取消</button>
           <button class="btn-confirm" @click="$emit('confirm')">確定</button>
@@ -13,12 +13,15 @@
 </template>
 
 <script setup>
-defineProps({ visible: Boolean })
-defineEmits(['confirm', 'cancel'])
+defineProps({
+  visible: Boolean,
+  message: { type: String, default: "確定要重置所有計時器嗎？" },
+});
+defineEmits(["confirm", "cancel"]);
 </script>
 
 <style lang="scss" scoped>
-@use '../styles/variables' as *;
+@use "../styles/variables" as *;
 
 .dialog-backdrop {
   position: fixed;

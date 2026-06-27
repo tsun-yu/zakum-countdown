@@ -1,201 +1,191 @@
 <template>
   <div class="buff-wrapper">
-    <div class="buff-layout">
-      <h1 class="title">Buff 計時器</h1>
+    <header class="page-header">
+      <h1 class="page-title">計時器</h1>
+      <button class="add-btn" @click="openAddDialog">＋ 新增計時器</button>
+    </header>
 
-      <div class="duration-config">
-        <span class="cfg-label">倒數時間</span>
-        <div class="cfg-controls">
-          <input
-            v-model.number="inputMinutes"
-            class="time-input"
-            type="number"
-            min="0"
-            max="99"
-          />
-          <span class="sep">分</span>
-          <input
-            v-model.number="inputSeconds"
-            class="time-input"
-            type="number"
-            min="0"
-            max="59"
-          />
-          <span class="sep">秒</span>
-          <button class="apply-btn" @click="applyDuration(false)">套用</button>
-        </div>
-      </div>
-
-      <div class="buff-slot">
-        <div class="block-wrapper">
-          <!-- Main card -->
-          <div
-            class="countdown-block buff"
-            :class="{
-              running: isRunning && !isWarning,
-              warning: isWarning,
-            }"
-            @click="handleClick"
-          >
-            <!-- Initial overlay -->
-            <div v-if="showOverlay" class="overlay buff">
-              <span class="overlay-text">開始施放Buff</span>
-            </div>
-
-            <!-- Active content -->
-            <template v-else>
-              <div class="top-row">
-                <span class="countdown-time">{{ displayTime }}</span>
-              </div>
-
-              <div class="progress-bar">
-                <div
-                  class="progress-fill buff"
-                  :class="{ warn: isWarning }"
-                  :style="{ width: progressPct + '%' }"
-                ></div>
-              </div>
-            </template>
-          </div>
-
-          <!-- Warning overlay -->
-          <div v-if="isWarning" class="warn-overlay buff" @click="handleClick">
-            <span class="warn-text buff">施放Buff</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="action-row">
-        <button class="restart-btn" @click="manualRestart">重新倒數</button>
-        <button class="reset-btn" :disabled="!hasStarted" @click="doReset">
-          停止
-        </button>
-      </div>
+    <div class="timer-list">
+      <TimerCard
+        v-for="t in timers"
+        :key="t.id"
+        :timer="t"
+        @edit="openEditDialog(t)"
+        @delete="confirmDelete(t)"
+      />
     </div>
+
+    <TimerFormDialog
+      :visible="dialogVisible"
+      :timer="editingTimer"
+      @save="handleSave"
+      @cancel="closeDialog"
+    />
+
+    <ConfirmDialog
+      :visible="!!deletingTimer"
+      :message="deleteMessage"
+      @confirm="handleDelete"
+      @cancel="deletingTimer = null"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useSpeech } from "../composables/useSpeech";
+import TimerCard from "../components/TimerCard.vue";
+import TimerFormDialog from "../components/TimerFormDialog.vue";
+import ConfirmDialog from "../components/ConfirmDialog.vue";
 
-// ── Config ────────────────────────────────────────────────
-const DEFAULT_DURATION = 180; // 3 minutes
-const WARN_AT = 5; // last N seconds show warning
+const STORAGE_KEY = "buff-view-timers-v1";
 
-// ── State ─────────────────────────────────────────────────
-const durationSec = ref(DEFAULT_DURATION);
-const inputMinutes = ref(Math.floor(DEFAULT_DURATION / 60));
-const inputSeconds = ref(DEFAULT_DURATION % 60);
-const current = ref(0);
-const hasStarted = ref(false);
-const isRunning = ref(false);
-
-let intervalId = null;
-
-const { speak, unlock } = useSpeech();
-
-// ── Derived ───────────────────────────────────────────────
-const showOverlay = computed(() => !hasStarted.value);
-const isWarning = computed(() => isRunning.value && current.value <= WARN_AT);
-const progressPct = computed(() => {
-  if (!durationSec.value) return 0;
-  return (current.value / durationSec.value) * 100;
-});
-const displayTime = computed(() => {
-  const m = Math.floor(current.value / 60);
-  const s = current.value % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+// Built-in Buff timer — preserves the original audio + UI text.
+const BUILTIN_BUFF = Object.freeze({
+  id: "buff-default",
+  name: "Buff",
+  durationSec: 180,
+  speechText: "給我狀態", // maps to /sounds/buff_warn_wayne.m4a
+  displayText: "施放Buff",
+  startText: "開始施放Buff",
+  isBuiltin: true,
 });
 
-// ── Voice trigger ─────────────────────────────────────────
-watch(isWarning, (val) => {
-  if (val) speak("給我狀態");
-});
+const { unlock } = useSpeech();
 
-// ── Actions ───────────────────────────────────────────────
-function clearTimers() {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
-  }
+// State ─────────────────────────────────────────────────────
+const timers = ref([{ ...BUILTIN_BUFF }]);
+const dialogVisible = ref(false);
+const editingTimer = ref(null);
+const deletingTimer = ref(null);
+let storageReady = false;
+
+const deleteMessage = computed(() =>
+  deletingTimer.value ? `確定要刪除「${deletingTimer.value.name}」嗎？` : "",
+);
+
+// Dialog handlers ───────────────────────────────────────────
+function openAddDialog() {
+  editingTimer.value = null;
+  dialogVisible.value = true;
 }
 
-function resetState() {
-  clearTimers();
-  current.value = 0;
-  hasStarted.value = false;
-  isRunning.value = false;
+function openEditDialog(t) {
+  editingTimer.value = t;
+  dialogVisible.value = true;
 }
 
-function normalizeDurationInput() {
-  const min = Math.max(0, Math.min(99, Number(inputMinutes.value) || 0));
-  const sec = Math.max(0, Math.min(59, Number(inputSeconds.value) || 0));
-  const total = Math.max(1, min * 60 + sec);
-  durationSec.value = total;
-  inputMinutes.value = Math.floor(total / 60);
-  inputSeconds.value = total % 60;
+function closeDialog() {
+  dialogVisible.value = false;
+  editingTimer.value = null;
 }
 
-function restartCycle() {
-  current.value = durationSec.value;
-  hasStarted.value = true;
-  isRunning.value = true;
-}
-
-function startLoopIfNeeded() {
-  if (intervalId) return;
-  intervalId = setInterval(() => {
-    if (current.value > 1) {
-      current.value--;
-    } else {
-      // Auto loop like cube-auto: immediately restart next cycle
-      restartCycle();
+function handleSave(formData) {
+  if (editingTimer.value) {
+    const idx = timers.value.findIndex((x) => x.id === editingTimer.value.id);
+    if (idx >= 0) {
+      const t = timers.value[idx];
+      if (t.isBuiltin) {
+        // Only duration is mutable for the built-in entry.
+        timers.value[idx] = { ...t, durationSec: formData.durationSec };
+      } else {
+        timers.value[idx] = {
+          ...t,
+          name: formData.name,
+          durationSec: formData.durationSec,
+          speechText: formData.speechText,
+        };
+      }
     }
-  }, 1000);
+  } else {
+    timers.value.push({
+      id: generateId(),
+      name: formData.name,
+      durationSec: formData.durationSec,
+      speechText: formData.speechText,
+      isBuiltin: false,
+    });
+  }
+  closeDialog();
 }
 
-function applyDuration(shouldRestart = false) {
-  normalizeDurationInput();
-  if (shouldRestart) {
-    restartCycle();
-    startLoopIfNeeded();
+function confirmDelete(t) {
+  if (t.isBuiltin) return;
+  deletingTimer.value = t;
+}
+
+function handleDelete() {
+  if (!deletingTimer.value || deletingTimer.value.isBuiltin) {
+    deletingTimer.value = null;
+    return;
+  }
+  timers.value = timers.value.filter((x) => x.id !== deletingTimer.value.id);
+  deletingTimer.value = null;
+}
+
+// Helpers ───────────────────────────────────────────────────
+function generateId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return "t-" + crypto.randomUUID();
+  }
+  return "t-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+}
+
+// Persistence ───────────────────────────────────────────────
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) return;
+
+    const storedBuiltin = data.find((x) => x?.id === BUILTIN_BUFF.id);
+    const custom = data
+      .filter((x) => x && x.id !== BUILTIN_BUFF.id && !x.isBuiltin)
+      .map((x) => ({
+        id: String(x.id || generateId()),
+        name: String(x.name || "計時器").slice(0, 40),
+        durationSec: Math.max(1, Number(x.durationSec) || 1),
+        speechText: String(x.speechText || "").slice(0, 100),
+        isBuiltin: false,
+      }));
+
+    const builtinDuration =
+      Math.max(1, Number(storedBuiltin?.durationSec) || 0) ||
+      BUILTIN_BUFF.durationSec;
+
+    timers.value = [
+      { ...BUILTIN_BUFF, durationSec: builtinDuration },
+      ...custom,
+    ];
+  } catch (_) {
+    /* ignore corrupt data */
   }
 }
 
-function manualRestart() {
-  applyDuration(true);
-}
+watch(
+  timers,
+  (newVal) => {
+    if (!storageReady) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal));
+    } catch (_) {
+      /* ignore */
+    }
+  },
+  { deep: true },
+);
 
-function doReset() {
-  resetState();
-}
-
-function handleClick() {
-  if (!hasStarted.value) manualRestart();
-}
-
-// ── Audio unlock (mirror HomeView) ────────────────────────
 onMounted(() => {
+  loadFromStorage();
+  storageReady = true;
   window.addEventListener("touchstart", unlock, { once: true, passive: true });
   window.addEventListener("pointerdown", unlock, { once: true });
-});
-
-onUnmounted(() => {
-  clearTimers();
 });
 </script>
 
 <style lang="scss" scoped>
-@use "sass:color";
 @use "../styles/variables" as *;
-
-// Buff theme — gold accent (re-uses cube layout)
-$buff-border: $accent-gold;
-$buff-progress: $accent-gold;
-$buff-progress-warn: $accent-warn;
-$buff-overlay-text: $accent-gold;
-$buff-warn-text: $accent-warn;
 
 .buff-wrapper {
   width: 100%;
@@ -204,261 +194,43 @@ $buff-warn-text: $accent-warn;
   display: flex;
   flex-direction: column;
   padding: 12px 14px;
+  gap: 14px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
-.buff-layout {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.title {
-  font-size: 18px;
+.page-title {
+  font-size: 20px;
   font-weight: 700;
   color: $text-primary;
-  text-align: center;
-  letter-spacing: 2px;
-  margin: 4px 0;
+  letter-spacing: 3px;
+  margin: 0;
 }
 
-.duration-config {
-  width: 100%;
-  background: $bg-card;
-  border: 1px solid $border-color;
+.add-btn {
+  padding: 10px 14px;
   border-radius: $radius-md;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.cfg-label {
-  font-size: 13px;
-  color: $text-secondary;
-  font-weight: 600;
-}
-
-.cfg-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.time-input {
-  width: 60px;
-  padding: 8px 10px;
-  border-radius: $radius-sm;
-  border: 1px solid $border-color;
-  background: $bg-dark;
-  color: $text-primary;
-  font-size: 15px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.sep {
-  color: $text-secondary;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.apply-btn {
-  margin-left: auto;
-  padding: 9px 12px;
-  border-radius: $radius-sm;
-  background: $accent-secondary;
-  color: #fff;
+  background: $accent-gold;
+  color: $bg-dark;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 1px;
-}
-
-.buff-slot {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-
-  > * {
-    flex: 1;
-    min-height: 0;
-  }
-}
-
-// ── Card (mirrors CountdownBlock) ─────────────────────────
-.block-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: $radius-lg;
-}
-
-.countdown-block {
-  position: relative;
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  border-radius: $radius-lg;
-  background: $bg-card;
-  border: 2px solid $border-color;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 20px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: border-color 0.3s;
-  will-change: transform;
-
-  &.buff.running {
-    border-color: $buff-border;
-  }
-  &.buff.warning {
-    border-color: $buff-border;
-    background: rgba(240, 165, 0, 0.08);
-  }
-}
-
-.overlay {
-  position: absolute;
-  inset: 0;
-  background: $overlay-bg;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: $radius-lg;
-
-  .overlay-text {
-    font-size: 24px;
-    font-weight: 700;
-    letter-spacing: 3px;
-  }
-
-  &.buff .overlay-text {
-    color: $buff-overlay-text;
-  }
-}
-
-.top-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.countdown-time {
-  font-size: 56px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 3px;
-  color: $text-primary;
-  line-height: 1;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 10px;
-  background: $progress-bg;
-  border-radius: 5px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  border-radius: 5px;
-  transition:
-    width 0.9s linear,
-    background 0.3s;
-
-  &.buff {
-    background: $buff-progress;
-  }
-  &.buff.warn {
-    background: $buff-progress-warn;
-  }
-}
-
-.warn-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: $radius-lg;
-  pointer-events: auto;
-
-  &.buff {
-    background: rgba(240, 165, 0, 0.18);
-  }
-}
-
-.warn-text {
-  font-size: 44px;
-  font-weight: 700;
-  letter-spacing: 6px;
-  animation: flash 0.6s ease-in-out infinite;
-
-  &.buff {
-    color: $buff-warn-text;
-  }
-}
-
-@keyframes flash {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.2;
-  }
-}
-
-// ── Reset button ──────────────────────────────────────────
-.action-row {
-  width: 100%;
-  display: flex;
-  gap: 10px;
-}
-
-.restart-btn,
-.reset-btn {
-  flex: 1;
-  padding: 16px;
-  border-radius: $radius-md;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  transition:
-    background 0.2s,
-    opacity 0.2s;
-}
-
-.restart-btn {
-  background: $accent-secondary;
+  transition: opacity 0.2s;
 
   &:active {
-    background: color.adjust($accent-secondary, $lightness: 8%);
+    opacity: 0.85;
   }
 }
 
-.reset-btn {
-  background: $reset-btn;
-
-  &:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-  }
-
-  &:not(:disabled):active {
-    background: $reset-btn-hover;
-  }
+.timer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 16px;
 }
 </style>

@@ -127,14 +127,24 @@ export function useSpeech() {
   }
 
   function speak(key) {
-    if (useAudioFiles || forceAudioKeys.has(key)) {
-      const a = audioPool[key];
-      if (!a) return;
+    const a = audioPool[key];
+
+    // Forced audio (always play file regardless of platform).
+    if (forceAudioKeys.has(key) && a) {
       a.currentTime = 0;
       a.play().catch(() => {});
       return;
     }
 
+    // Platform prefers audio AND we have a matching clip.
+    if (useAudioFiles && a) {
+      a.currentTime = 0;
+      a.play().catch(() => {});
+      return;
+    }
+
+    // Fallback: speak the text via Web Speech API. This also handles
+    // arbitrary user-defined text on any platform.
     if (hasSpeechSynthesis) {
       try {
         // Cancel anything queued so warnings don't pile up
