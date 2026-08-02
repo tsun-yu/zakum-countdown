@@ -86,9 +86,9 @@ const duration = computed(() => store.WATER_DURATION);
 // ── Overlay ──────────────────────────────────────────────
 const overlayText = computed(() => {
   if (props.blockType === "water") {
-    return store.currentMode === "body3" ? "出現魔方" : "出現雙魔方";
+    return "魔方結束";
   }
-  return "出現黑水";
+  return "黑水結束";
 });
 
 // Overlay only shows before start; done state shows warning content instead
@@ -107,10 +107,10 @@ const progressPct = computed(() => {
 });
 
 // ── Warning ──────────────────────────────────────────────
-// Active warning: last 10s of countdown OR full done period
+// Active warning: last 5s of countdown OR full done period
 const isWarning = computed(
   () =>
-    (timer.value.isRunning && timer.value.current <= 10) || timer.value.isDone,
+    (timer.value.isRunning && timer.value.current <= 5) || timer.value.isDone,
 );
 const warnText = computed(() =>
   props.blockType === "cube" ? "注意魔方" : "注意黑水",

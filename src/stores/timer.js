@@ -2,8 +2,8 @@ import { defineStore } from "pinia";
 import { ref, reactive, computed } from "vue";
 
 const CUBE_AUTO_DURATION = 150; // 2m30s
-const CUBE_HAND_DURATION = 40;
-const WATER_DURATION = 40;
+const CUBE_HAND_DURATION = 37;
+const WATER_DURATION = 37;
 
 function makeSubTimer() {
   return reactive({
