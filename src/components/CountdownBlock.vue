@@ -22,7 +22,6 @@
       :class="[
         blockType,
         {
-          disabled: !store.mainHasStarted,
           running: timer.isRunning && !isWarning,
           warning: isWarning,
         },
@@ -39,10 +38,6 @@
       <template v-else>
         <div class="top-row">
           <span class="countdown-time">{{ displayTime }}</span>
-        </div>
-
-        <div class="estimated-row" v-if="estimatedLabel">
-          <span class="estimated">預估 {{ estimatedLabel }}</span>
         </div>
 
         <div class="progress-bar" :class="blockType">
@@ -104,13 +99,6 @@ const displayTime = computed(() => {
   return String(timer.value.current).padStart(2, "0");
 });
 
-// ── Estimated time ────────────────────────────────────────
-const estimatedLabel = computed(() => {
-  const est = timer.value.estimatedTime;
-  if (est === null) return null;
-  return store.formatTime(est);
-});
-
 // ── Progress ─────────────────────────────────────────────
 const progressPct = computed(() => {
   const d = duration.value;
@@ -119,10 +107,10 @@ const progressPct = computed(() => {
 });
 
 // ── Warning ──────────────────────────────────────────────
-// Active warning: last 5s of countdown OR full 10s done period
+// Active warning: last 10s of countdown OR full done period
 const isWarning = computed(
   () =>
-    (timer.value.isRunning && timer.value.current <= 5) || timer.value.isDone,
+    (timer.value.isRunning && timer.value.current <= 10) || timer.value.isDone,
 );
 const warnText = computed(() =>
   props.blockType === "cube" ? "注意魔方" : "注意黑水",
@@ -135,7 +123,6 @@ watch(isWarning, (val) => {
 
 // ── Click handler ─────────────────────────────────────────
 function handleClick() {
-  if (!store.mainHasStarted) return;
   if (isSliding.value) return;
 
   if (timer.value.isDone) {
@@ -312,11 +299,6 @@ function handleSwipeReset() {
     border-color 0.3s;
   will-change: transform;
 
-  &.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
   // Cube — green theme
   &.cube.running {
     border-color: $cube-border;
@@ -375,18 +357,6 @@ function handleSwipeReset() {
   letter-spacing: 2px;
   color: $text-primary;
   line-height: 1;
-}
-
-.estimated-row {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.estimated {
-  font-size: 20px;
-  font-weight: 600;
-  color: $text-secondary;
 }
 
 // ── Progress bar ──────────────────────────────────────────

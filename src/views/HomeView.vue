@@ -2,7 +2,6 @@
   <div class="app-wrapper">
     <div class="app-layout">
       <div class="slot-tabs"><ModeTabBar /></div>
-      <div class="slot-main"><MainTimer /></div>
 
       <!-- cube-auto: hand + body1（隱藏時仍保留 DOM，計時不中斷） -->
       <div v-show="showCubeAuto" class="slot-cube-auto">
@@ -35,7 +34,6 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useTimerStore } from "../stores/timer";
 import { useSpeech } from "../composables/useSpeech";
 import ModeTabBar from "../components/ModeTabBar.vue";
-import MainTimer from "../components/MainTimer.vue";
 import CubeAutoBlock from "../components/CubeAutoBlock.vue";
 import CountdownBlock from "../components/CountdownBlock.vue";
 import ResetBar from "../components/ResetBar.vue";
@@ -129,38 +127,35 @@ onUnmounted(() =>
     // hand: cube-auto fills middle
     &:has(.slot-cube-auto):not(:has(.slot-cube)) {
       grid-template-areas:
-        "tabs      tabs      tabs"
-        "main      cube-auto cube-auto"
-        "reset     reset     reset";
-      grid-template-columns: 1fr 1fr 1fr;
+        "tabs      tabs"
+        "cube-auto cube-auto"
+        "reset     reset";
+      grid-template-columns: 1fr 1fr;
       grid-template-rows: auto 1fr auto;
     }
 
     // body1: cube-auto + cube + water
     &:has(.slot-cube-auto):has(.slot-cube) {
       grid-template-areas:
-        "tabs      tabs tabs  tabs"
-        "main      cauto cube water"
-        "reset     reset reset reset";
-      grid-template-columns: 1fr 1fr 1fr 1fr;
+        "tabs  tabs tabs"
+        "cauto cube water"
+        "reset reset reset";
+      grid-template-columns: 1fr 1fr 1fr;
       grid-template-rows: auto 1fr auto;
     }
 
     // body2/3: cube + water
     &:not(:has(.slot-cube-auto)):has(.slot-cube) {
       grid-template-areas:
-        "tabs  tabs  tabs"
-        "main  cube  water"
-        "reset reset reset";
-      grid-template-columns: 1fr 1fr 1fr;
+        "tabs  tabs"
+        "cube  water"
+        "reset reset";
+      grid-template-columns: 1fr 1fr;
       grid-template-rows: auto 1fr auto;
     }
 
     .slot-tabs {
       grid-area: tabs;
-    }
-    .slot-main {
-      grid-area: main;
     }
     .slot-cube-auto {
       grid-area: cauto;

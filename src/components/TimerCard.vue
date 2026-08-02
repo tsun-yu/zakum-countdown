@@ -70,7 +70,12 @@ const props = defineProps({
 
 defineEmits(["edit", "delete"]);
 
-const WARN_AT = 5;
+// Seconds before finishing that the warning + voice trigger.
+// Configurable per-timer via `timer.warnAt`, defaults to 5.
+const warnAt = computed(() => {
+  const v = Number(props.timer.warnAt);
+  return Number.isFinite(v) && v > 0 ? v : 5;
+});
 
 const current = ref(0);
 const hasStarted = ref(false);
@@ -81,7 +86,9 @@ const { speak } = useSpeech();
 
 // ── Derived ───────────────────────────────────────────────
 const showOverlay = computed(() => !hasStarted.value);
-const isWarning = computed(() => isRunning.value && current.value <= WARN_AT);
+const isWarning = computed(
+  () => isRunning.value && current.value <= warnAt.value,
+);
 const progressPct = computed(() => {
   if (!props.timer.durationSec) return 0;
   return (current.value / props.timer.durationSec) * 100;

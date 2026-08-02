@@ -4,7 +4,6 @@
     <div
       class="countdown-block cube"
       :class="{
-        disabled: !store.mainHasStarted,
         running:
           store.cubeAutoTimer.isRunning && !store.cubeAutoTimer.isWarning,
         warning: store.cubeAutoTimer.isWarning,
@@ -22,10 +21,6 @@
           <span class="countdown-time">{{
             store.formatTime(store.cubeAutoTimer.current)
           }}</span>
-        </div>
-
-        <div class="estimated-row" v-if="estimatedLabel">
-          <span class="estimated">預估 {{ estimatedLabel }}</span>
         </div>
 
         <div class="progress-bar">
@@ -74,14 +69,7 @@ const progressPct = computed(() => {
   return (store.cubeAutoTimer.current / d) * 100;
 });
 
-const estimatedLabel = computed(() => {
-  const est = store.cubeAutoTimer.estimatedTime;
-  if (est === null) return null;
-  return store.formatTime(est);
-});
-
 function handleClick() {
-  if (!store.mainHasStarted) return;
   if (!store.cubeAutoTimer.hasStarted) {
     store.startCubeAuto();
   }
