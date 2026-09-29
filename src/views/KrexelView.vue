@@ -7,9 +7,8 @@
           :key="stage.id"
           class="stage-button"
           :class="{ active: selectedStage === stage.id }"
-          :disabled="hasStarted"
           :aria-pressed="selectedStage === stage.id"
-          @click="selectedStage = stage.id"
+          @click="selectStage(stage.id)"
         >
           {{ stage.label }}
         </button>
@@ -17,7 +16,7 @@
 
       <button
         class="countdown-card"
-        :class="{ running, warning: isWarning, done: hasFinished }"
+        :class="{ running, warning: isWarning }"
         :disabled="hasStarted"
         @click="startCountdown"
       >
@@ -55,7 +54,6 @@ const stages = [
 const selectedStage = ref("first");
 const remainingSeconds = ref(null);
 const hasStarted = ref(false);
-const hasFinished = ref(false);
 const showResetDialog = ref(false);
 const { speak, unlock } = useSpeech();
 
@@ -63,7 +61,7 @@ let timerId;
 let deadline = 0;
 let warningPlayed = false;
 
-const running = computed(() => hasStarted.value && !hasFinished.value);
+const running = computed(() => hasStarted.value);
 const isWarning = computed(() => running.value && remainingSeconds.value <= 5);
 const formattedTime = computed(() => {
   const seconds = remainingSeconds.value ?? 0;
@@ -84,6 +82,17 @@ function startCountdown() {
   timerId = window.setInterval(updateCountdown, 100);
 }
 
+function selectStage(stageId) {
+  if (selectedStage.value === stageId) return;
+
+  window.clearInterval(timerId);
+  timerId = undefined;
+  selectedStage.value = stageId;
+  remainingSeconds.value = null;
+  hasStarted.value = false;
+  warningPlayed = false;
+}
+
 function updateCountdown() {
   const millisecondsLeft = Math.max(0, deadline - Date.now());
   remainingSeconds.value = Math.ceil(millisecondsLeft / 1000);
@@ -94,9 +103,11 @@ function updateCountdown() {
   }
 
   if (millisecondsLeft === 0) {
-    hasFinished.value = true;
     window.clearInterval(timerId);
     timerId = undefined;
+    remainingSeconds.value = null;
+    hasStarted.value = false;
+    warningPlayed = false;
   }
 }
 
@@ -106,7 +117,6 @@ function handleReset() {
   timerId = undefined;
   remainingSeconds.value = null;
   hasStarted.value = false;
-  hasFinished.value = false;
   warningPlayed = false;
 }
 
@@ -164,9 +174,6 @@ onUnmounted(() => {
     color: $text-primary;
   }
 
-  &:disabled {
-    cursor: default;
-  }
 }
 
 .countdown-card {
@@ -197,9 +204,6 @@ onUnmounted(() => {
     background: rgba(255, 107, 53, 0.1);
   }
 
-  &.done {
-    border-color: $accent-warn;
-  }
 }
 
 .card-label {
