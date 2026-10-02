@@ -14,110 +14,238 @@
         </button>
       </div>
 
-      <button
-        class="countdown-card"
-        :class="{ running, warning: isWarning }"
-        :disabled="hasStarted"
-        @click="startCountdown"
+      <div
+        v-for="timer in timerCards"
+        :key="timer.id"
+        class="timer-wrapper"
+        @touchstart.passive="onTouchStart(timer.id, $event)"
+        @touchmove.passive="onTouchMove(timer.id, $event)"
+        @touchend="onTouchEnd(timer.id)"
+        @touchcancel="onTouchEnd(timer.id)"
+        @mousedown="onMouseDown(timer.id, $event)"
       >
-        <span v-if="!hasStarted" class="card-label">叭叭叭</span>
-        <template v-else>
-          <span class="countdown-time">{{ formattedTime }}</span>
-          <span v-if="isWarning" class="warning-text">你後面有車</span>
-        </template>
-      </button>
+        <div
+          class="reset-panel"
+          :style="{ width: resetPanelWidth(timer.id) }"
+          @click.stop="resetTimer(timer.id)"
+        >
+          <span>重置</span>
+        </div>
 
-      <div class="slot-reset">
-        <ResetBar @reset="showResetDialog = true" />
+        <button
+          class="countdown-card"
+          :class="{ running: timer.hasStarted, warning: isWarning(timer) }"
+          :style="{ transform: `translateX(-${slideOffsets[timer.id]}px)` }"
+          @click="startCountdown(timer.id)"
+        >
+          <span v-if="!timer.hasStarted" class="card-label">{{
+            timer.label
+          }}</span>
+          <template v-else>
+            <span class="countdown-time">{{
+              formattedTime(timer.remainingSeconds)
+            }}</span>
+            <span v-if="isWarning(timer)" class="warning-text">你後面有車</span>
+          </template>
+        </button>
       </div>
     </div>
-
-    <ConfirmDialog
-      :visible="showResetDialog"
-      @confirm="handleReset"
-      @cancel="showResetDialog = false"
-    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useSpeech } from "../composables/useSpeech";
-import ConfirmDialog from "../components/ConfirmDialog.vue";
-import ResetBar from "../components/ResetBar.vue";
 
 const stages = [
-  { id: "first", label: "一階59%", duration: 85 },
-  { id: "second", label: "二階59%", duration: 30 },
+  { id: "first", label: "一階59%", honkDuration: 90, departedDuration: 85 },
+  {
+    id: "second100",
+    label: "二階100%",
+    honkDuration: 90,
+    departedDuration: 85,
+  },
+  { id: "second", label: "二階59%", honkDuration: 30, departedDuration: 25 },
 ];
 
 const selectedStage = ref("first");
-const remainingSeconds = ref(null);
-const hasStarted = ref(false);
-const showResetDialog = ref(false);
+const timerStates = reactive({
+  honk: {
+    label: "叭叭叭",
+    durationKey: "honkDuration",
+    remainingSeconds: null,
+    hasStarted: false,
+    warningPlayed: false,
+  },
+  departed: {
+    label: "已發車",
+    durationKey: "departedDuration",
+    remainingSeconds: null,
+    hasStarted: false,
+    warningPlayed: false,
+  },
+});
+const slideOffsets = reactive({ honk: 0, departed: 0 });
+const slidingTimers = reactive({ honk: false, departed: false });
 const { speak, unlock } = useSpeech();
 
-let timerId;
-let deadline = 0;
-let warningPlayed = false;
+const activeStage = computed(() =>
+  stages.find((stage) => stage.id === selectedStage.value),
+);
+const timerCards = computed(() =>
+  Object.entries(timerStates).map(([id, timer]) => ({ id, ...timer })),
+);
 
-const running = computed(() => hasStarted.value);
-const isWarning = computed(() => running.value && remainingSeconds.value <= 5);
-const formattedTime = computed(() => {
-  const seconds = remainingSeconds.value ?? 0;
+const timerIds = { honk: undefined, departed: undefined };
+const deadlines = { honk: 0, departed: 0 };
+const REVEAL_WIDTH = 160;
+const TRIGGER_DIST = 40;
+const dragState = {
+  timerId: null,
+  startX: 0,
+  startY: 0,
+  isDragging: false,
+  axisLocked: false,
+};
+
+function formattedTime(seconds) {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
-});
+}
 
-function startCountdown() {
-  if (hasStarted.value) return;
+function isWarning(timer) {
+  return timer.hasStarted && timer.remainingSeconds <= 5;
+}
 
-  const stage = stages.find((item) => item.id === selectedStage.value);
-  if (!stage) return;
+function startCountdown(timerId) {
+  const timer = timerStates[timerId];
+  if (!timer || timer.hasStarted || slidingTimers[timerId]) return;
 
-  hasStarted.value = true;
-  remainingSeconds.value = stage.duration;
-  deadline = Date.now() + stage.duration * 1000;
-  timerId = window.setInterval(updateCountdown, 100);
+  const duration = activeStage.value?.[timer.durationKey];
+  if (!duration) return;
+
+  timer.hasStarted = true;
+  timer.remainingSeconds = duration;
+  deadlines[timerId] = Date.now() + duration * 1000;
+  timerIds[timerId] = window.setInterval(() => updateCountdown(timerId), 100);
+}
+
+function updateCountdown(timerId) {
+  const timer = timerStates[timerId];
+  const millisecondsLeft = Math.max(0, deadlines[timerId] - Date.now());
+  timer.remainingSeconds = Math.ceil(millisecondsLeft / 1000);
+
+  if (
+    timer.remainingSeconds <= 5 &&
+    timer.remainingSeconds > 0 &&
+    !timer.warningPlayed
+  ) {
+    timer.warningPlayed = true;
+    speak("你後面有車");
+  }
+
+  if (millisecondsLeft === 0) {
+    window.clearInterval(timerIds[timerId]);
+    timerIds[timerId] = undefined;
+    timer.remainingSeconds = null;
+    timer.hasStarted = false;
+    timer.warningPlayed = false;
+  }
+}
+
+function resetTimer(timerId) {
+  const timer = timerStates[timerId];
+  if (!timer) return;
+
+  window.clearInterval(timerIds[timerId]);
+  timerIds[timerId] = undefined;
+  timer.remainingSeconds = null;
+  timer.hasStarted = false;
+  timer.warningPlayed = false;
+  snapBack(timerId);
 }
 
 function selectStage(stageId) {
   if (selectedStage.value === stageId) return;
 
-  window.clearInterval(timerId);
-  timerId = undefined;
+  resetTimer("honk");
+  resetTimer("departed");
   selectedStage.value = stageId;
-  remainingSeconds.value = null;
-  hasStarted.value = false;
-  warningPlayed = false;
 }
 
-function updateCountdown() {
-  const millisecondsLeft = Math.max(0, deadline - Date.now());
-  remainingSeconds.value = Math.ceil(millisecondsLeft / 1000);
-
-  if (remainingSeconds.value <= 5 && remainingSeconds.value > 0 && !warningPlayed) {
-    warningPlayed = true;
-    speak("你後面有車");
-  }
-
-  if (millisecondsLeft === 0) {
-    window.clearInterval(timerId);
-    timerId = undefined;
-    remainingSeconds.value = null;
-    hasStarted.value = false;
-    warningPlayed = false;
-  }
+function resetPanelWidth(timerId) {
+  return slideOffsets[timerId] > 0 ? `${slideOffsets[timerId]}px` : "0px";
 }
 
-function handleReset() {
-  showResetDialog.value = false;
-  window.clearInterval(timerId);
-  timerId = undefined;
-  remainingSeconds.value = null;
-  hasStarted.value = false;
-  warningPlayed = false;
+function onTouchStart(timerId, event) {
+  beginSwipe(timerId, event.touches[0].clientX, event.touches[0].clientY);
+}
+
+function onTouchMove(timerId, event) {
+  moveSwipe(timerId, event.touches[0].clientX, event.touches[0].clientY);
+}
+
+function onTouchEnd(timerId) {
+  finishSwipe(timerId);
+}
+
+function onMouseDown(timerId, event) {
+  beginSwipe(timerId, event.clientX, event.clientY);
+
+  const onMove = (moveEvent) => {
+    moveSwipe(timerId, moveEvent.clientX, moveEvent.clientY);
+  };
+
+  const onUp = () => {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    finishSwipe(timerId);
+  };
+
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+}
+
+function beginSwipe(timerId, x, y) {
+  dragState.timerId = timerId;
+  dragState.startX = x;
+  dragState.startY = y;
+  dragState.isDragging = true;
+  dragState.axisLocked = false;
+}
+
+function moveSwipe(timerId, x, y) {
+  if (!dragState.isDragging || dragState.timerId !== timerId) return;
+
+  const dx = dragState.startX - x;
+  const dy = dragState.startY - y;
+  if (!dragState.axisLocked) {
+    if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+    dragState.axisLocked = Math.abs(dx) > Math.abs(dy);
+  }
+  if (!dragState.axisLocked) return;
+
+  slideOffsets[timerId] = Math.max(0, Math.min(REVEAL_WIDTH, dx));
+  slidingTimers[timerId] = slideOffsets[timerId] > 5;
+}
+
+function finishSwipe(timerId) {
+  if (!dragState.isDragging || dragState.timerId !== timerId) return;
+
+  dragState.isDragging = false;
+  if (slideOffsets[timerId] >= TRIGGER_DIST) {
+    slideOffsets[timerId] = REVEAL_WIDTH + 5;
+  } else {
+    snapBack(timerId);
+  }
+  window.setTimeout(() => {
+    slidingTimers[timerId] = false;
+  }, 50);
+}
+
+function snapBack(timerId) {
+  slideOffsets[timerId] = 0;
 }
 
 onMounted(() => {
@@ -126,7 +254,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  window.clearInterval(timerId);
+  window.clearInterval(timerIds.honk);
+  window.clearInterval(timerIds.departed);
 });
 </script>
 
@@ -146,37 +275,77 @@ onUnmounted(() => {
 .app-layout {
   display: flex;
   flex: 1;
+  min-height: 0;
   flex-direction: column;
   gap: 12px;
 }
 
 .stage-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  width: 100%;
 }
 
 .stage-button {
-  min-height: 64px;
-  padding: 12px;
-  border: 2px solid $border-color;
-  border-radius: $radius-lg;
-  background: $bg-card;
+  flex: 1;
+  padding: 10px 4px;
+  border-radius: $radius-sm;
+  background: $tab-inactive-bg;
   color: $text-secondary;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  transition: border-color 0.2s, background 0.2s, color 0.2s;
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    background 0.2s,
+    color 0.2s;
+  white-space: nowrap;
 
   &.active {
-    border-color: $accent-gold;
-    background: $bg-card-hover;
-    color: $text-primary;
+    background: $tab-active-bg;
+    color: #fff;
   }
 
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.timer-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: $radius-lg;
+}
+
+.reset-panel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: $radius-lg;
+  background: $reset-btn;
+  cursor: pointer;
+  overflow: hidden;
+  transition: width 0.15s ease;
+
+  span {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
 }
 
 .countdown-card {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -189,11 +358,11 @@ onUnmounted(() => {
   border-radius: $radius-lg;
   background: $bg-card;
   color: $text-primary;
-  transition: border-color 0.3s, background 0.3s;
-
-  &:not(:disabled) {
-    cursor: pointer;
-  }
+  transition:
+    border-color 0.3s,
+    background 0.3s,
+    transform 0.15s ease;
+  will-change: transform;
 
   &.running {
     border-color: $accent-gold;
@@ -203,7 +372,6 @@ onUnmounted(() => {
     border-color: $accent-warn;
     background: rgba(255, 107, 53, 0.1);
   }
-
 }
 
 .card-label {
@@ -213,7 +381,7 @@ onUnmounted(() => {
 }
 
 .countdown-time {
-  font-size: clamp(48px, 16vw, 76px);
+  font-size: clamp(42px, 12vw, 64px);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 2px;
@@ -222,15 +390,10 @@ onUnmounted(() => {
 
 .warning-text {
   color: $accent-warn;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: 2px;
   animation: flash 0.6s ease-in-out infinite;
-}
-
-.slot-reset {
-  display: flex;
-  flex-direction: column;
 }
 
 @keyframes flash {
